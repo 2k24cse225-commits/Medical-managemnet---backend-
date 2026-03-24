@@ -23,13 +23,30 @@ public class ChatbotServer {
 
         server.createContext("/chat", (HttpExchange exchange) -> {
 
-            if ("POST".equals(exchange.getRequestMethod())) {
+            // ✅ CORS HEADERS (for all requests)
+            exchange.getResponseHeaders().add("Access-Control-Allow-Origin", "*");
+            exchange.getResponseHeaders().add("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+            exchange.getResponseHeaders().add("Access-Control-Allow-Headers", "Content-Type");
+
+            // ✅ Handle OPTIONS (preflight)
+            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
+                try {
+                    exchange.sendResponseHeaders(204, -1);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                return;
+            }
+
+            if ("POST".equalsIgnoreCase(exchange.getRequestMethod())) {
 
                 try {
                     // Read user input
                     BufferedReader br = new BufferedReader(
                             new InputStreamReader(exchange.getRequestBody(), "utf-8"));
                     String userMessage = br.readLine();
+
+                    if (userMessage == null) userMessage = "Hello";
 
                     // JSON request
                     String jsonRequest = "{"
@@ -55,6 +72,7 @@ public class ChatbotServer {
                             request, HttpResponse.BodyHandlers.ofString());
 
                     byte[] resp = response.body().getBytes();
+
                     exchange.sendResponseHeaders(200, resp.length);
                     OutputStream os = exchange.getResponseBody();
                     os.write(resp);
@@ -63,14 +81,22 @@ public class ChatbotServer {
                 } catch (Exception e) {
                     e.printStackTrace();
                     String error = "Error occurred";
-                    exchange.sendResponseHeaders(500, error.length());
-                    OutputStream os = exchange.getResponseBody();
-                    os.write(error.getBytes());
-                    os.close();
+                    try {
+                        exchange.sendResponseHeaders(500, error.length());
+                        OutputStream os = exchange.getResponseBody();
+                        os.write(error.getBytes());
+                        os.close();
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
+                    }
                 }
 
             } else {
-                exchange.sendResponseHeaders(405, -1);
+                try {
+                    exchange.sendResponseHeaders(405, -1);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
         });
 
